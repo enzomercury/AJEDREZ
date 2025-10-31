@@ -29,7 +29,7 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
 
-      // ===================== Utilidades =====================
+      // ===================== Galería =====================
       const GALLERY_ITEMS = [
         { name: "Rey", file: "foto1.jpg" },
         { name: "Reina", file: "foto2.jpg" },
@@ -45,7 +45,6 @@
         useEffect(()=>{ if(delay===null) return; const id=setInterval(()=>saved.current(), delay); return ()=>clearInterval(id); },[delay]);
       }
 
-      // ===================== Carrusel =====================
       function GalleryCarousel(){
         const [i, setI] = useState(0);
         const [auto, setAuto] = useState(true);
@@ -53,7 +52,7 @@
         useInterval(()=> setI(prev => (prev+1)%GALLERY_ITEMS.length), auto? 4000 : null);
 
         return (
-          <div className="relative w-full max-w-xl mx-auto">
+          <div className="relative w-full max-w-3xl mx-auto">
             <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-xl" style={{background:"var(--bordo-3)"}}>
               <figure key={current.file} className="fade-enter fade-enter-active w-full h-full flex items-center justify-center">
                 <img
@@ -98,107 +97,32 @@
         );
       }
 
-      // ===================== Tablero =====================
-      const PIECES = { r:"♜", n:"♞", b:"♝", q:"♛", k:"♚", p:"♟", R:"♖", N:"♘", B:"♗", Q:"♕", K:"♔", P:"♙" };
-
-      const STYLES = {
-        default: { showCoords:true, sizeClass:'text-3xl', dark:'#ede2e2', light:'#ffffff' },
-        minimalist: { showCoords:false, sizeClass:'text-2xl', dark:'#f6f6f6', light:'#ffffff' },
-        surreal: { showCoords:true, sizeClass:'text-4xl', dark:'#f7e1e1', light:'#f0caca' },
-      };
-
-      function startingBoard(){
-        const rows = ["rnbqkbnr","pppppppp","8","8","8","8","PPPPPPPP","RNBQKBNR"]; const board=[];
-        for(const r of rows){ const row=[]; for(const ch of r){ if(ch==='8'){ for(let i=0;i<8;i++) row.push(null); } else { row.push(ch); } } board.push(row); }
-        return board;
-      }
-      function randomSurrealBoard(){
-        const keys = Object.keys(PIECES); const b = Array.from({length:8},()=>Array(8).fill(null));
-        const count = 12 + Math.floor(Math.random()*10);
-        for(let i=0;i<count;i++){ const r=Math.floor(Math.random()*8), c=Math.floor(Math.random()*8); b[r][c]=keys[Math.floor(Math.random()*keys.length)]; }
-        return b;
-      }
-
-      function ChessBoard(){
-        const [board, setBoard] = useState(startingBoard());
-        const [selected, setSelected] = useState(null);
-        const [mode, setMode] = useState('default');
-        const style = STYLES[mode];
-
-        const cellColor=(r,c)=> ((r+c)%2? style.dark : style.light);
-
-        function onCellClick(r,c){
-          const piece = board[r][c];
-          if(selected){
-            const [sr,sc] = selected; if(sr===r && sc===c){ setSelected(null); return; }
-            const next = board.map(row=>row.slice()); next[r][c]=next[sr][sc]; next[sr][sc]=null; setBoard(next); setSelected(null);
-          } else if(piece){ setSelected([r,c]); }
-        }
-
-        function exportSVG(){
-          const size=64; const parts=[];
-          for(let r=0;r<8;r++) for(let c=0;c<8;c++){
-            const x=c*size, y=r*size; const fill=cellColor(r,c);
-            parts.push(`<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${fill}"/>`);
-            const p=board[r][c]; if(p){ const g=PIECES[p]; parts.push(`<text x="${x+size/2}" y="${y+size/2+12}" font-size="36" text-anchor="middle">${g}</text>`); }
-          }
-          const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${8*size}" height="${8*size}">${parts.join('')}</svg>`;
-          const uri='data:image/svg+xml;utf8,'+encodeURIComponent(svg); window.open(uri,'_blank');
-        }
-
-        return (
-          <div className="p-4 rounded-3xl shadow-2xl border" style={{borderColor:'var(--bordo)'}}>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <button onClick={()=>{setBoard(startingBoard()); setMode('default')}} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{background:'var(--bordo)'}}>Reiniciar</button>
-              <button onClick={()=>{setBoard(randomSurrealBoard()); setMode('surreal')}} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{background:'var(--bordo-2)'}}>Surrealizar</button>
-              <button onClick={()=>setMode(m=> m==='minimalist'?'default':'minimalist')} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{background:'#2e7d6b'}}>Minimalismo</button>
-              <button onClick={exportSVG} className="px-3 py-2 rounded-lg shadow-sm border bg-white">Exportar SVG</button>
-            </div>
-
-            <div className="inline-block rounded-xl overflow-hidden">
-              <div className="grid grid-cols-8 gap-0">
-                {board.map((row,r)=> row.map((cell,c)=>{
-                  const sel = selected && selected[0]===r && selected[1]===c;
-                  return (
-                    <button key={`${r}-${c}`} onClick={()=>onCellClick(r,c)} className={`cell w-16 h-16 md:w-20 md:h-20 flex items-center justify-center relative ${sel?'ring-4':''}`} style={{background:cellColor(r,c), aspectRatio:'1/1', ...(sel?{boxShadow:`0 0 0 4px var(--bordo)`}:{})}}>
-                      {cell ? <span className={`${style.sizeClass} select-none`}>{PIECES[cell]}</span> : <span className="opacity-0">.</span>}
-                      {style.showCoords && <span className="absolute bottom-0 right-0 text-[9px] opacity-60 pr-1 pb-1">{String.fromCharCode(97+c)}{8-r}</span>}
-                    </button>
-                  );
-                }))}
-              </div>
-            </div>
-          </div>
-        );
-      }
-
+      // ===================== App (solo Intro + Galería en vertical) =====================
       function App(){
         return (
-          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <aside className="p-5 rounded-2xl shadow-lg text-white" style={{background:'var(--bordo)'}}>
-              <div className="flex items-center justify-between mb-2">
-                <h1 className="text-2xl font-bold">Ajedrez Interdisciplinario</h1>
-                <span className="text-xs bg-white/20 rounded px-2 py-1">Arte × Computación</span>
+          <div className="max-w-4xl mx-auto flex flex-col gap-6">
+            {/* Intro */}
+            <section className="p-6 rounded-2xl shadow-lg text-white" style={{background:'var(--bordo)'}}>
+              <div className="flex items-start justify-between">
+                <h1 className="text-3xl font-extrabold leading-tight">Ajedrez<br/>Interdisciplinario</h1>
+                <span className="text-xs bg-white/20 rounded px-2 py-1 mt-1">Arte × Computación</span>
               </div>
-              <p className="text-sm opacity-90">Proyecto conjunto con piezas intervenidas en estilos <em>minimalista</em> y <em>surrealista</em>. Navegá la galería y explorá el tablero interactivo.</p>
-            </aside>
+              <p className="mt-3 text-sm opacity-95 max-w-3xl">
+                Proyecto conjunto con piezas intervenidas en estilos <em>minimalista</em> y <em>surrealista</em>.
+                Navegá la galería y explorá el tablero interactivo.
+              </p>
+            </section>
 
-            <main className="space-y-4">
-              <section className="p-5 rounded-2xl shadow-lg text-white" style={{background:'var(--bordo-2)'}}>
-                <div className="flex items-center gap-2 mb-3">
-                  <span>📷</span>
-                  <h2 className="text-lg font-semibold">Galería — Piezas del tablero</h2>
-                </div>
-                <GalleryCarousel />
-              </section>
-            </main>
+            {/* Galería (único bloque visible debajo) */}
+            <section className="p-6 rounded-2xl shadow-lg text-white" style={{background:'var(--bordo-2)'}}>
+              <div className="flex items-center gap-2 mb-3">
+                <span>📷</span>
+                <h2 className="text-lg font-semibold">Galería — Piezas del tablero</h2>
+              </div>
+              <GalleryCarousel />
+            </section>
 
-            <aside className="p-5 rounded-2xl shadow-lg bg-white" style={{borderTop:'4px solid var(--bordo)'}}>
-              <h2 className="text-lg font-semibold mb-3" style={{color:'var(--bordo)'}}>Tablero interactivo</h2>
-              <ChessBoard />
-            </aside>
-
-            <footer className="lg:col-span-3 text-center text-xs text-neutral-700 mt-2">
+            <footer className="text-center text-xs text-neutral-700">
               © <span id="year"></span> Arte × Computación — Liceo / UTU
             </footer>
           </div>
