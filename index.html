@@ -25,8 +25,9 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- ==== App (JSX) ==== -->
     <script type="text/babel">
-      const { useState, useEffect, useRef, useMemo } = React;
+      const { useState, useEffect, useRef } = React;
 
       // ===================== Utilidades =====================
       const GALLERY_ITEMS = [
@@ -103,7 +104,7 @@
       const STYLES = {
         default: { showCoords:true, sizeClass:'text-3xl', dark:'#ede2e2', light:'#ffffff' },
         minimalist: { showCoords:false, sizeClass:'text-2xl', dark:'#f6f6f6', light:'#ffffff' },
-        surreal: { showCoords:true, sizeClass:'text-4xl', dark:'#f7e1e1', light:'#f0caca' }, // tonos bordó claros
+        surreal: { showCoords:true, sizeClass:'text-4xl', dark:'#f7e1e1', light:'#f0caca' },
       };
 
       function startingBoard(){
@@ -124,7 +125,7 @@
         const [mode, setMode] = useState('default');
         const style = STYLES[mode];
 
-        function cellColor(r,c){ return (r+c)%2? style.dark : style.light; }
+        const cellColor=(r,c)=> ((r+c)%2? style.dark : style.light);
 
         function onCellClick(r,c){
           const piece = board[r][c];
@@ -171,7 +172,6 @@
         );
       }
 
-      // ===================== App =====================
       function App(){
         return (
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -198,13 +198,17 @@
               <ChessBoard />
             </aside>
 
-     <footer class="lg:col-span-3 text-center text-xs text-neutral-700 mt-2">
-  © <span id="year"></span> Arte × Computación — Liceo / UTU
-</footer>
+            <footer className="lg:col-span-3 text-center text-xs text-neutral-700 mt-2">
+              © <span id="year"></span> Arte × Computación — Liceo / UTU
+            </footer>
+          </div>
+        );
+      }
 
-<script type="text/babel">
-  const root = ReactDOM.createRoot(document.getElementById("root"));
-  root.render(<App />);
-  document.getElementById("year").textContent = new Date().getFullYear();
-</script>
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App/>);
+      document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
 
