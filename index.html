@@ -1,356 +1,210 @@
-import React, { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Pause, Play, Camera, Sun, Moon, Download } from "lucide-react";
-
-/**
- * Ajedrez Interdisciplinario — Página React con predominio de color bordó.
- * Versión sin QR, con carrusel de imágenes y tablero interactivo completo.
- */
-
-// =====================
-// Paleta Bordó
-// =====================
-const PRIMARY_BORDO = "#7a1c1c"; // principal
-const SECONDARY_BORDO = "#9b2c2c"; // secciones
-const LIGHT_BORDO = "#f3d9d9"; // fondos claros
-
-// =====================
-// Galería (edita los nombres/archivos según tus fotos)
-// Colocá foto1.jpg..foto6.jpg en /public o carpeta pública del proyecto
-// =====================
-const GALLERY_ITEMS = [
-  { name: "Rey", file: "foto1.jpg" },
-  { name: "Reina", file: "foto2.jpg" },
-  { name: "Alfil", file: "foto3.jpg" },
-  { name: "Caballo", file: "foto4.jpg" },
-  { name: "Torre", file: "foto5.jpg" },
-  { name: "Peón", file: "foto6.jpg" },
-];
-
-function useInterval(callback: () => void, delay: number | null) {
-  const saved = useRef(callback);
-  useEffect(() => { saved.current = callback; }, [callback]);
-  useEffect(() => {
-    if (delay === null) return;
-    const id = setInterval(() => saved.current(), delay);
-    return () => clearInterval(id);
-  }, [delay]);
-}
-
-function GalleryCarousel() {
-  const [i, setI] = useState(0);
-  const [auto, setAuto] = useState(true);
-  const current = GALLERY_ITEMS[i];
-
-  useInterval(() => setI((prev) => (prev + 1) % GALLERY_ITEMS.length), auto ? 4000 : null);
-
-  return (
-    <div className="relative w-full max-w-xl mx-auto">
-      <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-xl" style={{ backgroundColor: LIGHT_BORDO }}>
-        <AnimatePresence mode="wait">
-          <motion.figure
-            key={current.file}
-            initial={{ opacity: 0.0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.35 }}
-            className="w-full h-full flex items-center justify-center"
-          >
-            <img
-              src={current.file}
-              alt={current.name}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                const parent = e.currentTarget.parentElement;
-                if (parent && parent.querySelector(".fallback") === null) {
-                  const div = document.createElement("div");
-                  div.className =
-                    "fallback flex flex-col items-center justify-center w-full h-full text-center p-6 bg-rose-100";
-                  div.innerHTML = `<div class='text-6xl'>🎨</div><div class='mt-2 font-semibold'>${current.name}</div><div class='text-xs opacity-70'>Subí ${current.file} al repo</div>`;
-                  parent.appendChild(div);
-                }
-              }}
-            />
-          </motion.figure>
-        </AnimatePresence>
-      </div>
-
-      <div className="absolute inset-0 flex items-center justify-between p-2">
-        <button onClick={() => setI((x) => (x - 1 + GALLERY_ITEMS.length) % GALLERY_ITEMS.length)} className="rounded-full p-2 bg-white/80 hover:bg-white shadow">
-          <ChevronLeft />
-        </button>
-        <button onClick={() => setI((x) => (x + 1) % GALLERY_ITEMS.length)} className="rounded-full p-2 bg-white/80 hover:bg-white shadow">
-          <ChevronRight />
-        </button>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between">
-        <div className="text-sm font-medium">
-          <span>{current.name}</span>
-          <span className="opacity-60"> — {current.file}</span>
-        </div>
-        <button
-          onClick={() => setAuto((a) => !a)}
-          className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-full border shadow-sm"
-          style={{ backgroundColor: PRIMARY_BORDO, color: "white" }}
-        >
-          {auto ? <Pause size={16} /> : <Play size={16} />} {auto ? "Pausar" : "Reproducir"}
-        </button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-center gap-1">
-        {GALLERY_ITEMS.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => setI(idx)}
-            className={`h-2 w-6 rounded-full ${idx === i ? "bg-neutral-800" : "bg-neutral-400"}`}
-            aria-label={`Ir a imagen ${idx + 1}`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// =====================
-// Tablero Interactivo (con export a SVG)
-// =====================
-const PIECES_UNICODE: Record<string, string> = {
-  r: "♜", n: "♞", b: "♝", q: "♛", k: "♚", p: "♟",
-  R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔", P: "♙",
-};
-
-const MINIMALIST_STYLE = {
-  showCoordinates: false,
-  pieceSize: "text-2xl",
-  palette: ["#ffffff", "#f6f6f6"],
-  border: "border-none",
-};
-const SURREAL_STYLE = {
-  showCoordinates: true,
-  pieceSize: "text-4xl",
-  palette: ["#f7e1e1", "#f0caca"], // tonos bordó claros en damero
-  border: "border-2 border-dashed border-white/30",
-};
-const DEFAULT_STYLE = {
-  showCoordinates: true,
-  pieceSize: "text-3xl",
-  palette: ["#ffffff", "#eaeaea"],
-  border: "border",
-};
-
-function startingBoard(): (string | null)[][] {
-  const rows = [
-    "rnbqkbnr",
-    "pppppppp",
-    "8",
-    "8",
-    "8",
-    "8",
-    "PPPPPPPP",
-    "RNBQKBNR",
-  ];
-  const board: (string | null)[][] = [];
-  for (let r of rows) {
-    const row: (string | null)[] = [];
-    for (let ch of r) {
-      if (ch === "8") {
-        for (let i = 0; i < 8; i++) row.push(null);
-      } else {
-        row.push(ch);
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ajedrez Interdisciplinario — Arte × Computación</title>
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root{
+        --bordo:#7a1c1c;      /* principal */
+        --bordo-2:#9b2c2c;    /* secciones */
+        --bordo-3:#f3d9d9;    /* fondo claro */
       }
-    }
-    board.push(row);
-  }
-  return board;
-}
+      .fade-enter{opacity:.0;transform:scale(.98)}
+      .fade-enter-active{opacity:1;transform:scale(1);transition:opacity .35s ease, transform .35s ease}
+      .cell{box-shadow: inset 0 0 0 1px rgba(0,0,0,.05)}
+    </style>
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-white to-rose-50 text-slate-900">
+    <div id="root" class="p-6"></div>
 
-function randomSurrealBoard(): (string | null)[][] {
-  const options = Object.keys(PIECES_UNICODE);
-  const board = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => null as string | null));
-  const count = 12 + Math.floor(Math.random() * 10);
-  for (let i = 0; i < count; i++) {
-    const r = Math.floor(Math.random() * 8);
-    const c = Math.floor(Math.random() * 8);
-    const p = options[Math.floor(Math.random() * options.length)];
-    board[r][c] = p;
-  }
-  return board;
-}
+    <!-- React 18 UMD + Babel (para usar JSX sin build) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-function ChessBoard() {
-  const [board, setBoard] = useState<(string | null)[][]>(startingBoard());
-  const [selected, setSelected] = useState<[number, number] | null>(null);
-  const [mode, setMode] = useState<"default" | "minimalist" | "surreal">("default");
-  const [style, setStyle] = useState(DEFAULT_STYLE);
+    <script type="text/babel">
+      const { useState, useEffect, useRef, useMemo } = React;
 
-  useEffect(() => {
-    if (mode === "minimalist") setStyle(MINIMALIST_STYLE);
-    else if (mode === "surreal") setStyle(SURREAL_STYLE);
-    else setStyle(DEFAULT_STYLE);
-  }, [mode]);
+      // ===================== Utilidades =====================
+      const GALLERY_ITEMS = [
+        { name: "Rey", file: "foto1.jpg" },
+        { name: "Reina", file: "foto2.jpg" },
+        { name: "Alfil", file: "foto3.jpg" },
+        { name: "Caballo", file: "foto4.jpg" },
+        { name: "Torre", file: "foto5.jpg" },
+        { name: "Peón", file: "foto6.jpg" },
+      ];
 
-  function cellBg(r: number, c: number) {
-    const palette = style.palette;
-    return palette[(r + c) % palette.length];
-  }
-
-  function onCellClick(r: number, c: number) {
-    const piece = board[r][c];
-    if (selected) {
-      const [sr, sc] = selected;
-      if (sr === r && sc === c) {
-        setSelected(null);
-        return;
+      function useInterval(callback, delay){
+        const saved = useRef(callback);
+        useEffect(()=>{ saved.current = callback; }, [callback]);
+        useEffect(()=>{ if(delay===null) return; const id=setInterval(()=>saved.current(), delay); return ()=>clearInterval(id); },[delay]);
       }
-      const next = board.map((row) => row.slice());
-      next[r][c] = next[sr][sc];
-      next[sr][sc] = null;
-      setBoard(next);
-      setSelected(null);
-    } else if (piece) {
-      setSelected([r, c]);
-    }
-  }
 
-  function reset() {
-    setBoard(startingBoard());
-    setMode("default");
-  }
-  function surrealize() {
-    setBoard(randomSurrealBoard());
-    setMode("surreal");
-  }
+      // ===================== Carrusel =====================
+      function GalleryCarousel(){
+        const [i, setI] = useState(0);
+        const [auto, setAuto] = useState(true);
+        const current = GALLERY_ITEMS[i];
+        useInterval(()=> setI(prev => (prev+1)%GALLERY_ITEMS.length), auto? 4000 : null);
 
-  function exportSVG() {
-    const size = 64;
-    const parts: string[] = [];
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const x = c * size;
-        const y = r * size;
-        const fill = cellBg(r, c);
-        parts.push(`<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${fill}"/>`);
-        const p = board[r][c];
-        if (p) {
-          const glyph = PIECES_UNICODE[p];
-          parts.push(`<text x="${x + size / 2}" y="${y + size / 2 + 12}" font-size="36" text-anchor="middle">${glyph}</text>`);
-        }
-      }
-    }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${8 * size}" height="${8 * size}">${parts.join("")}</svg>`;
-    const uri = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-    window.open(uri, "_blank");
-  }
-
-  return (
-    <div className="p-4 rounded-3xl shadow-2xl border" style={{ borderColor: PRIMARY_BORDO }}>
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <button onClick={reset} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{ backgroundColor: PRIMARY_BORDO }}>Reiniciar</button>
-        <button onClick={surrealize} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{ backgroundColor: SECONDARY_BORDO }}>Surrealizar</button>
-        <button
-          onClick={() => setMode((m) => (m === "minimalist" ? "default" : "minimalist"))}
-          className="px-3 py-2 rounded-lg shadow-sm text-white" style={{ backgroundColor: "#2e7d6b" }}
-        >
-          Minimalismo
-        </button>
-        <button onClick={exportSVG} className="px-3 py-2 rounded-lg shadow-sm border bg-white inline-flex items-center gap-2">
-          <Download size={16} /> Exportar SVG
-        </button>
-      </div>
-
-      <div className="inline-block rounded-xl overflow-hidden">
-        <div className="grid grid-cols-8 gap-0">
-          {board.map((row, r) =>
-            row.map((cell, c) => {
-              const isSelected = selected && selected[0] === r && selected[1] === c;
-              return (
-                <motion.button
-                  key={`${r}-${c}`}
-                  onClick={() => onCellClick(r, c)}
-                  whileTap={{ scale: 0.96 }}
-                  className={`w-16 h-16 md:w-20 md:h-20 flex items-center justify-center relative ${isSelected ? "ring-4" : ""}`}
-                  style={{ aspectRatio: "1 / 1", backgroundColor: cellBg(r, c), boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.05)", ...(isSelected ? { boxShadow: `0 0 0 4px ${PRIMARY_BORDO}` } : {}) }}
-                >
-                  {cell ? (
-                    <motion.span layout className="text-3xl select-none">
-                      {PIECES_UNICODE[cell]}
-                    </motion.span>
-                  ) : (
-                    <span className="text-xs opacity-0">.</span>
-                  )}
-                  {style.showCoordinates && (
-                    <span className="absolute bottom-0 right-0 text-[9px] opacity-60 pr-1 pb-1">
-                      {String.fromCharCode(97 + c)}{8 - r}
-                    </span>
-                  )}
-                </motion.button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =====================
-// Página Principal
-// =====================
-export default function AjedrezInterdisciplinarioApp() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  useEffect(() => {
-    if (theme === "dark") document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, [theme]);
-
-  return (
-    <div className="min-h-screen p-6" style={{ background: "linear-gradient(to bottom, #ffffff, #fdecec)" }}>
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Intro */}
-        <motion.aside
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-5 rounded-2xl shadow-lg text-white"
-          style={{ backgroundColor: PRIMARY_BORDO }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl font-bold">Ajedrez Interdisciplinario</h1>
-            <button
-              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-white/20 text-white hover:bg-white/30"
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} Tema
-            </button>
-          </div>
-          <p className="text-sm opacity-90">
-            Proyecto conjunto entre <strong>Taller de Arte</strong> y <strong>Ciencias de la Computación</strong>.
-            Tablero a escala con piezas intervenidas en estilos <em>minimalista</em> y <em>surrealista</em>.
-          </p>
-        </motion.aside>
-
-        {/* Galería */}
-        <main className="space-y-4">
-          <section className="p-5 rounded-2xl shadow-lg text-white" style={{ backgroundColor: SECONDARY_BORDO }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Camera size={18} />
-              <h2 className="text-lg font-semibold">Galería — Piezas del tablero</h2>
+        return (
+          <div className="relative w-full max-w-xl mx-auto">
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-xl" style={{background:"var(--bordo-3)"}}>
+              <figure key={current.file} className="fade-enter fade-enter-active w-full h-full flex items-center justify-center">
+                <img
+                  src={current.file}
+                  alt={current.name}
+                  className="w-full h-full object-cover"
+                  onError={(e)=>{
+                    e.currentTarget.style.display='none';
+                    const parent = e.currentTarget.parentElement;
+                    if(parent && !parent.querySelector('.fallback')){
+                      const div = document.createElement('div');
+                      div.className='fallback flex flex-col items-center justify-center w-full h-full text-center p-6 bg-rose-100';
+                      div.innerHTML = `<div class='text-6xl'>🎨</div><div class='mt-2 font-semibold'>${current.name}</div><div class='text-xs opacity-70'>Subí ${current.file} al repo</div>`;
+                      parent.appendChild(div);
+                    }
+                  }}
+                />
+              </figure>
             </div>
-            <GalleryCarousel />
-          </section>
-        </main>
 
-        {/* Tablero */}
-        <aside className="p-5 rounded-2xl shadow-lg bg-white" style={{ borderTop: `4px solid ${PRIMARY_BORDO}` }}>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: PRIMARY_BORDO }}>Tablero interactivo</h2>
-          <ChessBoard />
-        </aside>
-      </div>
+            <div className="absolute inset-0 flex items-center justify-between p-2">
+              <button onClick={()=>setI(x => (x-1+GALLERY_ITEMS.length)%GALLERY_ITEMS.length)} className="rounded-full p-2 bg-white/80 hover:bg-white shadow" aria-label="Anterior">◀</button>
+              <button onClick={()=>setI(x => (x+1)%GALLERY_ITEMS.length)} className="rounded-full p-2 bg-white/80 hover:bg-white shadow" aria-label="Siguiente">▶</button>
+            </div>
 
-      <footer className="max-w-6xl mx-auto mt-6 text-center text-xs text-neutral-700">
-        © {new Date().getFullYear()} Arte × Computación — Liceo / UTU | Hecho con React & Tailwind
-      </footer>
-    </div>
-  );
-}
+            <div className="mt-3 flex items-center justify-between">
+              <div className="text-sm font-medium">
+                <span>{current.name}</span>
+                <span className="opacity-60"> — {current.file}</span>
+              </div>
+              <button onClick={()=>setAuto(a=>!a)} className="px-3 py-1.5 rounded-full border shadow-sm text-white" style={{background:"var(--bordo)"}}>
+                {auto ? 'Pausar' : 'Reproducir'}
+              </button>
+            </div>
+
+            <div className="mt-2 flex items-center justify-center gap-1">
+              {GALLERY_ITEMS.map((_, idx)=> (
+                <button key={idx} onClick={()=>setI(idx)} className={`h-2 w-6 rounded-full ${idx===i? 'bg-neutral-800':'bg-neutral-400'}`} aria-label={`Ir a imagen ${idx+1}`}></button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // ===================== Tablero =====================
+      const PIECES = { r:"♜", n:"♞", b:"♝", q:"♛", k:"♚", p:"♟", R:"♖", N:"♘", B:"♗", Q:"♕", K:"♔", P:"♙" };
+
+      const STYLES = {
+        default: { showCoords:true, sizeClass:'text-3xl', dark:'#ede2e2', light:'#ffffff' },
+        minimalist: { showCoords:false, sizeClass:'text-2xl', dark:'#f6f6f6', light:'#ffffff' },
+        surreal: { showCoords:true, sizeClass:'text-4xl', dark:'#f7e1e1', light:'#f0caca' }, // tonos bordó claros
+      };
+
+      function startingBoard(){
+        const rows = ["rnbqkbnr","pppppppp","8","8","8","8","PPPPPPPP","RNBQKBNR"]; const board=[];
+        for(const r of rows){ const row=[]; for(const ch of r){ if(ch==='8'){ for(let i=0;i<8;i++) row.push(null); } else { row.push(ch); } } board.push(row); }
+        return board;
+      }
+      function randomSurrealBoard(){
+        const keys = Object.keys(PIECES); const b = Array.from({length:8},()=>Array(8).fill(null));
+        const count = 12 + Math.floor(Math.random()*10);
+        for(let i=0;i<count;i++){ const r=Math.floor(Math.random()*8), c=Math.floor(Math.random()*8); b[r][c]=keys[Math.floor(Math.random()*keys.length)]; }
+        return b;
+      }
+
+      function ChessBoard(){
+        const [board, setBoard] = useState(startingBoard());
+        const [selected, setSelected] = useState(null);
+        const [mode, setMode] = useState('default');
+        const style = STYLES[mode];
+
+        function cellColor(r,c){ return (r+c)%2? style.dark : style.light; }
+
+        function onCellClick(r,c){
+          const piece = board[r][c];
+          if(selected){
+            const [sr,sc] = selected; if(sr===r && sc===c){ setSelected(null); return; }
+            const next = board.map(row=>row.slice()); next[r][c]=next[sr][sc]; next[sr][sc]=null; setBoard(next); setSelected(null);
+          } else if(piece){ setSelected([r,c]); }
+        }
+
+        function exportSVG(){
+          const size=64; const parts=[];
+          for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+            const x=c*size, y=r*size; const fill=cellColor(r,c);
+            parts.push(`<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${fill}"/>`);
+            const p=board[r][c]; if(p){ const g=PIECES[p]; parts.push(`<text x="${x+size/2}" y="${y+size/2+12}" font-size="36" text-anchor="middle">${g}</text>`); }
+          }
+          const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${8*size}" height="${8*size}">${parts.join('')}</svg>`;
+          const uri='data:image/svg+xml;utf8,'+encodeURIComponent(svg); window.open(uri,'_blank');
+        }
+
+        return (
+          <div className="p-4 rounded-3xl shadow-2xl border" style={{borderColor:'var(--bordo)'}}>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <button onClick={()=>{setBoard(startingBoard()); setMode('default')}} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{background:'var(--bordo)'}}>Reiniciar</button>
+              <button onClick={()=>{setBoard(randomSurrealBoard()); setMode('surreal')}} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{background:'var(--bordo-2)'}}>Surrealizar</button>
+              <button onClick={()=>setMode(m=> m==='minimalist'?'default':'minimalist')} className="px-3 py-2 rounded-lg shadow-sm text-white" style={{background:'#2e7d6b'}}>Minimalismo</button>
+              <button onClick={exportSVG} className="px-3 py-2 rounded-lg shadow-sm border bg-white">Exportar SVG</button>
+            </div>
+
+            <div className="inline-block rounded-xl overflow-hidden">
+              <div className="grid grid-cols-8 gap-0">
+                {board.map((row,r)=> row.map((cell,c)=>{
+                  const sel = selected && selected[0]===r && selected[1]===c;
+                  return (
+                    <button key={`${r}-${c}`} onClick={()=>onCellClick(r,c)} className={`cell w-16 h-16 md:w-20 md:h-20 flex items-center justify-center relative ${sel?'ring-4':''}`} style={{background:cellColor(r,c), aspectRatio:'1/1', ...(sel?{boxShadow:`0 0 0 4px var(--bordo)`}:{})}}>
+                      {cell ? <span className={`${style.sizeClass} select-none`}>{PIECES[cell]}</span> : <span className="opacity-0">.</span>}
+                      {style.showCoords && <span className="absolute bottom-0 right-0 text-[9px] opacity-60 pr-1 pb-1">{String.fromCharCode(97+c)}{8-r}</span>}
+                    </button>
+                  );
+                }))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ===================== App =====================
+      function App(){
+        return (
+          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <aside className="p-5 rounded-2xl shadow-lg text-white" style={{background:'var(--bordo)'}}>
+              <div className="flex items-center justify-between mb-2">
+                <h1 className="text-2xl font-bold">Ajedrez Interdisciplinario</h1>
+                <span className="text-xs bg-white/20 rounded px-2 py-1">Arte × Computación</span>
+              </div>
+              <p className="text-sm opacity-90">Proyecto conjunto con piezas intervenidas en estilos <em>minimalista</em> y <em>surrealista</em>. Navegá la galería y explorá el tablero interactivo.</p>
+            </aside>
+
+            <main className="space-y-4">
+              <section className="p-5 rounded-2xl shadow-lg text-white" style={{background:'var(--bordo-2)'}}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span>📷</span>
+                  <h2 className="text-lg font-semibold">Galería — Piezas del tablero</h2>
+                </div>
+                <GalleryCarousel />
+              </section>
+            </main>
+
+            <aside className="p-5 rounded-2xl shadow-lg bg-white" style={{borderTop:'4px solid var(--bordo)'}}>
+              <h2 className="text-lg font-semibold mb-3" style={{color:'var(--bordo)'}}>Tablero interactivo</h2>
+              <ChessBoard />
+            </aside>
+
+            <footer className="lg:col-span-3 text-center text-xs text-neutral-700 mt-2">© <script>document.write(new Date().getFullYear())</script> Arte × Computación — Liceo / UTU</footer>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App/>);
+    </script>
+  </body>
+</html>
