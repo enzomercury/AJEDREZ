@@ -1,0 +1,267 @@
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+
+// Chess Avant-Garde App
+// Single-file React component (TailwindCSS + Framer Motion assumed available)
+
+// Unicode pieces (white uppercase, black lowercase)
+const PIECES = {
+  r: "♜",
+  n: "♞",
+  b: "♝",
+  q: "♛",
+  k: "♚",
+  p: "♟",
+  R: "♖",
+  N: "♘",
+  B: "♗",
+  Q: "♕",
+  K: "♔",
+  P: "♙",
+};
+
+// Minimalist and surreal presets
+const MINIMALIST_STYLE = {
+  showCoordinates: false,
+  pieceSize: "text-2xl",
+  palette: ["bg-white", "bg-gray-100"],
+  border: "border-none",
+};
+const SURREAL_STYLE = {
+  showCoordinates: true,
+  pieceSize: "text-4xl",
+  palette: ["bg-gradient-to-br from-purple-100 via-pink-50 to-yellow-100", "bg-gradient-to-tr from-indigo-200 via-cyan-50 to-lime-100"],
+  border: "border-2 border-dashed border-white/30",
+};
+const DEFAULT_STYLE = {
+  showCoordinates: true,
+  pieceSize: "text-3xl",
+  palette: ["bg-white", "bg-gray-200"],
+  border: "border",
+};
+
+// Generate starting chessboard (simple FEN parser for starting position)
+function startingBoard() {
+  const rows = [
+    "rnbqkbnr",
+    "pppppppp",
+    "8",
+    "8",
+    "8",
+    "8",
+    "PPPPPPPP",
+    "RNBQKBNR",
+  ];
+  // Convert rows into board
+  const board = [];
+  for (let r of rows) {
+    const row = [];
+    for (let ch of r) {
+      if (ch === "8") {
+        for (let i = 0; i < 8; i++) row.push(null);
+      } else {
+        row.push(ch);
+      }
+    }
+    board.push(row);
+  }
+  return board;
+}
+
+function randomSurrealBoard() {
+  const options = Object.keys(PIECES);
+  const board = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => null));
+  // place a few pieces randomly for a 'surreal' composition
+  const count = 12 + Math.floor(Math.random() * 10);
+  for (let i = 0; i < count; i++) {
+    const r = Math.floor(Math.random() * 8);
+    const c = Math.floor(Math.random() * 8);
+    const p = options[Math.floor(Math.random() * options.length)];
+    board[r][c] = p;
+  }
+  return board;
+}
+
+export default function ChessAvantGardeApp() {
+  const [board, setBoard] = useState(startingBoard());
+  const [selected, setSelected] = useState(null);
+  const [mode, setMode] = useState("default"); // default | minimalist | surreal
+  const [style, setStyle] = useState(DEFAULT_STYLE);
+  const [theme, setTheme] = useState("light");
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    if (mode === "minimalist") setStyle(MINIMALIST_STYLE);
+    else if (mode === "surreal") setStyle(SURREAL_STYLE);
+    else setStyle(DEFAULT_STYLE);
+  }, [mode]);
+
+  function cellColor(r, c) {
+    const dark = (r + c) % 2 === 1;
+    return dark ? "bg-neutral-700/80" : "bg-neutral-50/90";
+  }
+
+  function onCellClick(r, c) {
+    const piece = board[r][c];
+    if (selected) {
+      // simple move: move selected to target (no legality checks)
+      const [sr, sc] = selected;
+      if (sr === r && sc === c) {
+        setSelected(null);
+        return;
+      }
+      const newBoard = board.map((row) => row.slice());
+      newBoard[r][c] = newBoard[sr][sc];
+      newBoard[sr][sc] = null;
+      setHistory((h) => [...h, { from: [sr, sc], to: [r, c], piece: newBoard[r][c] }]);
+      setBoard(newBoard);
+      setSelected(null);
+    } else if (piece) {
+      setSelected([r, c]);
+    }
+  }
+
+  function resetBoard() {
+    setBoard(startingBoard());
+    setHistory([]);
+    setMode("default");
+  }
+
+  function randomizeSurreal() {
+    setBoard(randomSurrealBoard());
+    setMode("surreal");
+  }
+
+  function toggleMinimalist() {
+    setMode((m) => (m === "minimalist" ? "default" : "minimalist"));
+  }
+
+  function exportPNG() {
+    // Create a simple SVG snapshot and open in new tab (no external libs)
+    const svgParts = [];
+    const size = 64;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const x = c * size;
+        const y = r * size;
+        const dark = (r + c) % 2 === 1;
+        const fill = dark ? "#2b2b2b" : "#f3f3f3";
+        svgParts.push(<rect x='${x}' y='${y}' width='${size}' height='${size}' fill='${fill}'/>);
+        const p = board[r][c];
+        if (p) {
+          const glyph = PIECES[p];
+          svgParts.push(<text x='${x + size/2}' y='${y + size/2 + 12}' font-size='36' text-anchor='middle'>${glyph}</text>);
+        }
+      }
+    }
+    const svg = <svg xmlns='http://www.w3.org/2000/svg' width='${8*size}' height='${8*size}'>${svgParts.join("")}</svg>;
+    const uri = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    window.open(uri, "_blank");
+  }
+
+  return (
+    <div className={min-h-screen p-6 ${theme === "dark" ? "bg-neutral-900 text-white" : "bg-gradient-to-b from-white to-slate-50 text-slate-800"}}>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Left column: Controls & Manifesto */}
+        <motion.aside initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="col-span-1 md:col-span-1 p-4 rounded-2xl shadow-lg bg-white/60 backdrop-blur-sm dark:bg-black/40">
+          <h1 className="text-2xl font-bold mb-2">Ajedrez Avant‑Garde</h1>
+          <p className="text-sm mb-4">App conceptual que mezcla <strong>ajedrez</strong>, el <em>minimalismo</em> y el <em>surrealismo</em>. Mueve piezas, cambia modos y observa composiciones poéticas en el tablero.</p>
+
+          <div className="flex gap-2 mb-3">
+            <button onClick={resetBoard} className="px-3 py-2 rounded-lg shadow-sm bg-slate-800 text-white">Reiniciar</button>
+            <button onClick={randomizeSurreal} className="px-3 py-2 rounded-lg shadow-sm bg-pink-600 text-white">Surrealizar</button>
+            <button onClick={toggleMinimalist} className="px-3 py-2 rounded-lg shadow-sm bg-emerald-600 text-white">Minimalismo</button>
+          </div>
+
+          <div className="flex gap-2 mb-3">
+            <button onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} className="px-3 py-2 rounded-md border">Tema</button>
+            <button onClick={exportPNG} className="px-3 py-2 rounded-md border">Exportar SVG</button>
+          </div>
+
+          <div className="mt-4 text-sm">
+            <h3 className="font-semibold">Mini‑manifiesto</h3>
+            <p className="mt-2">Minimalismo: reducir — dejar sólo la idea. Surrealismo: mezclar el sueño y la lógica. En este tablero ambos conviven: la economía de formas frente a escenas oníricas.</p>
+          </div>
+
+          <div className="mt-4 text-xs opacity-80">
+            <strong>Interacciones</strong>
+            <ul className="list-disc pl-5 mt-2">
+              <li>Click en una pieza para seleccionarla, click en destino para mover.</li>
+              <li>Modo surreal crea composiciones aleatorias.</li>
+              <li>Minimalismo oculta coordenadas y simplifica bordes.</li>
+            </ul>
+          </div>
+        </motion.aside>
+
+        {/* Center: Chessboard */}
+        <main className="col-span-1 md:col-span-1 flex justify-center items-start">
+          <motion.div initial={{ scale: 0.98 }} animate={{ scale: 1 }} className={p-4 rounded-3xl shadow-2xl ${style.border}}>
+            <div className="inline-block rounded-xl overflow-hidden">
+              <div className="grid grid-cols-8 gap-0">
+                {board.map((row, r) =>
+                  row.map((cell, c) => {
+                    const dark = (r + c) % 2 === 1;
+                    const bg = mode === "surreal" ? style.palette[(r + c) % style.palette.length] : cellColor(r, c);
+                    const isSelected = selected && selected[0] === r && selected[1] === c;
+                    return (
+                      <motion.button
+                        key={${r}-${c}}
+                        onClick={() => onCellClick(r, c)}
+                        whileTap={{ scale: 0.96 }}
+                        className={w-16 h-16 md:w-20 md:h-20 flex items-center justify-center ${bg} ${isSelected ? "ring-4 ring-yellow-300" : ""} relative}
+                        style={{ aspectRatio: "1 / 1" }}
+                      >
+                        {cell ? (
+                          <motion.span layout className={${style.pieceSize} select-none}>
+                            {PIECES[cell]}
+                          </motion.span>
+                        ) : (
+                          <span className="text-xs opacity-0">.</span>
+                        )}
+                        {style.showCoordinates && (
+                          <span className="absolute bottom-0 right-0 text-[9px] opacity-60 pr-1 pb-1">{String.fromCharCode(97 + c)}{8 - r}</span>
+                        )}
+                      </motion.button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </main>
+
+        {/* Right column: Gallery & History */}
+        <aside className="col-span-1 md:col-span-1 p-4 rounded-2xl shadow-lg bg-white/60 backdrop-blur-sm dark:bg-black/40">
+          <h3 className="text-lg font-semibold mb-2">Galería — Piezas & Composiciones</h3>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="p-3 rounded-lg border min-h-[72px] flex items-center justify-center">Minimal — una torre</div>
+            <div className="p-3 rounded-lg border min-h-[72px] flex items-center justify-center">Surreal — caballo lunar</div>
+            <div className="p-3 rounded-lg border min-h-[72px] flex items-center justify-center">Espacio negativo</div>
+            <div className="p-3 rounded-lg border min-h-[72px] flex items-center justify-center">Sueño de rey</div>
+          </div>
+
+          <h4 className="font-semibold mb-2">Historial (movimientos)</h4>
+          <div className="space-y-1 max-h-40 overflow-auto text-sm">
+            {history.length === 0 && <div className="text-xs opacity-70">— sin movimientos —</div>}
+            {history.map((h, i) => (
+              <div key={i} className="flex justify-between">
+                <div>{String.fromCharCode(97 + h.from[1])}{8 - h.from[0]} → {String.fromCharCode(97 + h.to[1])}{8 - h.to[0]}</div>
+                <div className="opacity-70">{h.piece ? PIECES[h.piece] : ""}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 text-xs opacity-80">
+            <strong>Notas de diseño</strong>
+            <ul className="list-disc pl-5 mt-2">
+              <li>UI minimalista: tipografías, espacio negativo, paleta limitada.</li>
+              <li>Surreal: capas, gradientes y micro‑animaciones para evocar sueño.</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+
+      <footer className="max-w-6xl mx-auto mt-6 text-center text-xs opacity-80">Creado como experimento artístico: ajedrez × minimalismo × surrealismo — Interactúa y transforma la composición.</footer>
+    </div>
+  );
+}
