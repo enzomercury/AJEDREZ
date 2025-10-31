@@ -198,13 +198,13 @@
               <ChessBoard />
             </aside>
 
-            <footer className="lg:col-span-3 text-center text-xs text-neutral-700 mt-2">© <script>document.write(new Date().getFullYear())</script> Arte × Computación — Liceo / UTU</footer>
-          </div>
-        );
-      }
+     <footer class="lg:col-span-3 text-center text-xs text-neutral-700 mt-2">
+  © <span id="year"></span> Arte × Computación — Liceo / UTU
+</footer>
 
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App/>);
-    </script>
-  </body>
-</html>
+<script type="text/babel">
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(<App />);
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
